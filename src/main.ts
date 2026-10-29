@@ -14,7 +14,7 @@ const config: Phaser.Types.Core.GameConfig = {
   parent: 'game-container',
   width: LOGICAL_W,
   height: LOGICAL_H,
-  backgroundColor: '#fff8e1',
+  backgroundColor: '#fff4f0',
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -30,6 +30,13 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 const game = new Phaser.Game(config);
+
+declare global {
+  interface Window {
+    __BLOOM_GAME__?: Phaser.Game;
+  }
+}
+window.__BLOOM_GAME__ = game;
 
 const unlock = () => {
   unlockAudio();

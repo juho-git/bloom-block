@@ -27,7 +27,7 @@ import {
   type GameRun,
 } from '../core/game';
 import { previewClears } from '../core/scoring';
-import type { BoosterId, PieceInstance } from '../core/types';
+import type { BoosterId, PieceInstance, ScoreBreakdown } from '../core/types';
 import { getStage } from '../data/stages';
 import { getAds, maybeShowInterstitial, showRewardedAd } from '../platform/createAds';
 import { playSfx, setAdMuted } from '../services/audio';
@@ -35,6 +35,13 @@ import { Haptic } from '../services/haptics';
 import { t } from '../services/i18n';
 import { loadSave, recordEndless, recordStageClear, updateSave } from '../services/save';
 import { makeButton } from '../ui/Button';
+import {
+  drawEmptyBoardCell,
+  drawJellyBlock,
+  drawSeedCell,
+  paintGardenBackdrop,
+  spawnPetalBurst,
+} from '../ui/draw';
 import { FONT, UI } from '../ui/theme';
 
 interface GameInit {
@@ -81,6 +88,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.cream);
+    paintGardenBackdrop(this);
     if (this.mode === 'stage') {
       this.run = startStage(getStage(this.stageId));
     } else {
@@ -101,11 +109,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawHudChrome(): void {
-    this.add.rectangle(LOGICAL_W / 2, 100, LOGICAL_W - 40, 160, UI.panel).setStrokeStyle(2, UI.panelStroke);
-    this.scoreText = this.add.text(40, 40, '', FONT.h2);
-    this.goalText = this.add.text(40, 100, '', FONT.body);
-    makeButton(this, LOGICAL_W - 90, 70, 120, 72, '⏸', () => this.openPause(), {
-      color: 0xbcaaa4,
+    const g = this.add.graphics();
+    g.fillStyle(UI.shadow, 0.2);
+    g.fillRoundedRect(24 + 3, 28 + 5, LOGICAL_W - 48, 150, 28);
+    g.fillStyle(UI.panel, 0.96);
+    g.fillRoundedRect(24, 28, LOGICAL_W - 48, 150, 28);
+    g.lineStyle(3, UI.panelStroke, 1);
+    g.strokeRoundedRect(24, 28, LOGICAL_W - 48, 150, 28);
+    this.scoreText = this.add.text(48, 48, '', { ...FONT.h2, fontSize: '30px' });
+    this.goalText = this.add.text(48, 108, '', { ...FONT.body, fontSize: '20px', color: UI.textLight });
+    makeButton(this, LOGICAL_W - 90, 100, 110, 72, '⏸', () => this.openPause(), {
+      color: UI.lavender,
       fontSize: '28px',
     });
   }
@@ -134,28 +148,42 @@ export class GameScene extends Phaser.Scene {
   private redrawBoard(highlight?: ClearedLines): void {
     const g = this.cellGfx;
     g.clear();
+    // wooden-soft board frame
+    g.fillStyle(UI.shadow, 0.2);
+    g.fillRoundedRect(
+      BOARD_ORIGIN_X - 12 + 3,
+      BOARD_ORIGIN_Y - 12 + 5,
+      BOARD_SIZE * CELL + 24,
+      BOARD_SIZE * CELL + 24,
+      22,
+    );
+    g.fillStyle(COLORS.boardFrame, 1);
+    g.fillRoundedRect(
+      BOARD_ORIGIN_X - 12,
+      BOARD_ORIGIN_Y - 12,
+      BOARD_SIZE * CELL + 24,
+      BOARD_SIZE * CELL + 24,
+      22,
+    );
     g.fillStyle(COLORS.boardBg, 1);
-    g.fillRoundedRect(BOARD_ORIGIN_X - 8, BOARD_ORIGIN_Y - 8, BOARD_SIZE * CELL + 16, BOARD_SIZE * CELL + 16, 12);
+    g.fillRoundedRect(
+      BOARD_ORIGIN_X - 4,
+      BOARD_ORIGIN_Y - 4,
+      BOARD_SIZE * CELL + 8,
+      BOARD_SIZE * CELL + 8,
+      16,
+    );
     for (let r = 0; r < BOARD_SIZE; r++) {
       for (let c = 0; c < BOARD_SIZE; c++) {
         const x = BOARD_ORIGIN_X + c * CELL;
         const y = BOARD_ORIGIN_Y + r * CELL;
         const v = getCell(this.run.board, r, c);
-        const hlRow = highlight?.rows.includes(r);
-        const hlCol = highlight?.cols.includes(c);
-        if (hlRow || hlCol) g.fillStyle(0xfff59d, 0.85);
-        else g.fillStyle(0xfff8e7, 1);
-        g.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
-        g.lineStyle(1, COLORS.gridLine, 1);
-        g.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+        const hl = !!highlight && (highlight.rows.includes(r) || highlight.cols.includes(c));
+        drawEmptyBoardCell(g, x, y, CELL, hl);
         if (v === SEED) {
-          g.fillStyle(COLORS.soil, 1);
-          g.fillRoundedRect(x + 6, y + 6, CELL - 12, CELL - 12, 8);
-          g.fillStyle(0xffe082, 1);
-          g.fillCircle(x + CELL / 2, y + CELL / 2, 8);
+          drawSeedCell(g, x, y, CELL);
         } else if (v >= 1 && v <= 5) {
-          g.fillStyle(BLOCK_COLORS[v - 1]!, 1);
-          g.fillRoundedRect(x + 4, y + 4, CELL - 8, CELL - 8, 10);
+          drawJellyBlock(g, x, y, CELL, v);
         }
       }
     }
@@ -164,22 +192,21 @@ export class GameScene extends Phaser.Scene {
   private drawGhost(piece: PieceInstance, atR: number, atC: number, clears: ClearedLines | null): void {
     const g = this.ghostGfx;
     g.clear();
+    if (clears) {
+      g.fillStyle(0xffb7c5, 0.28);
+      for (const r of clears.rows) {
+        g.fillRoundedRect(BOARD_ORIGIN_X, BOARD_ORIGIN_Y + r * CELL, BOARD_SIZE * CELL, CELL, 8);
+      }
+      for (const c of clears.cols) {
+        g.fillRoundedRect(BOARD_ORIGIN_X + c * CELL, BOARD_ORIGIN_Y, CELL, BOARD_SIZE * CELL, 8);
+      }
+    }
     for (const cell of piece.cells) {
       const r = atR + cell.r;
       const c = atC + cell.c;
       const x = BOARD_ORIGIN_X + c * CELL;
       const y = BOARD_ORIGIN_Y + r * CELL;
-      g.fillStyle(BLOCK_COLORS[piece.color - 1]!, 0.45);
-      g.fillRoundedRect(x + 4, y + 4, CELL - 8, CELL - 8, 10);
-    }
-    if (clears) {
-      g.fillStyle(0xfff59d, 0.35);
-      for (const r of clears.rows) {
-        g.fillRect(BOARD_ORIGIN_X, BOARD_ORIGIN_Y + r * CELL, BOARD_SIZE * CELL, CELL);
-      }
-      for (const c of clears.cols) {
-        g.fillRect(BOARD_ORIGIN_X + c * CELL, BOARD_ORIGIN_Y, CELL, BOARD_SIZE * CELL);
-      }
+      drawJellyBlock(g, x, y, CELL, piece.color, 0.5);
     }
   }
 
@@ -197,29 +224,24 @@ export class GameScene extends Phaser.Scene {
       const piece = this.run.tray[i];
       const cx = startX + i * slotW;
       const cy = TRAY_Y + 90;
-      const slot = this.add.rectangle(cx, cy, 180, 160, UI.panel).setStrokeStyle(2, UI.panelStroke);
-      const container = this.add.container(cx, cy, [slot]);
+      const slotGfx = this.add.graphics();
+      slotGfx.fillStyle(UI.shadow, 0.18);
+      slotGfx.fillRoundedRect(-90 + 3, -80 + 5, 180, 160, 24);
+      slotGfx.fillStyle(UI.panel, 1);
+      slotGfx.fillRoundedRect(-90, -80, 180, 160, 24);
+      slotGfx.lineStyle(3, UI.panelStroke, 1);
+      slotGfx.strokeRoundedRect(-90, -80, 180, 160, 24);
+      const hit = this.add.rectangle(0, 0, 180, 160, 0x000000, 0.001);
+      const container = this.add.container(cx, cy, [slotGfx, hit]);
       if (piece) {
         const visual = this.makePieceVisual(piece, TRAY_CELL);
         container.add(visual);
-        // Hit area on the whole slot; disable child input so pieces don't steal events
-        visual.iterate((child: Phaser.GameObjects.GameObject) => {
-          if ('disableInteractive' in child) {
-            (child as Phaser.GameObjects.Rectangle).disableInteractive();
-          }
-        });
-        slot.setInteractive({ useHandCursor: true });
         const startDrag = (p: Phaser.Input.Pointer) => {
           if (this.paused || this.run.over || this.boosterMode) return;
           this.beginDrag(i, piece, p);
         };
-        slot.on('pointerdown', startDrag);
-        container.setSize(180, 160);
-        container.setInteractive(
-          new Phaser.Geom.Rectangle(-90, -80, 180, 160),
-          Phaser.Geom.Rectangle.Contains,
-        );
-        container.on('pointerdown', startDrag);
+        hit.setInteractive({ useHandCursor: true });
+        hit.on('pointerdown', startDrag);
       }
       this.trayContainers.push(container);
     }
@@ -229,18 +251,11 @@ export class GameScene extends Phaser.Scene {
     const c = this.add.container(0, 0);
     const ox = -((piece.width * cell) / 2);
     const oy = -((piece.height * cell) / 2);
+    const g = this.add.graphics();
     for (const cellPos of piece.cells) {
-      const rect = this.add
-        .rectangle(
-          ox + cellPos.c * cell + cell / 2,
-          oy + cellPos.r * cell + cell / 2,
-          cell - 4,
-          cell - 4,
-          BLOCK_COLORS[piece.color - 1],
-        )
-        .setStrokeStyle(1, 0xffffff, 0.3);
-      c.add(rect);
+      drawJellyBlock(g, ox + cellPos.c * cell, oy + cellPos.r * cell, cell, piece.color);
     }
+    c.add(g);
     return c;
   }
 
@@ -340,22 +355,24 @@ export class GameScene extends Phaser.Scene {
         Haptic.place();
         this.tweens.add({
           targets: this.cameras.main,
-          zoom: 1.01,
-          duration: 60,
+          zoom: 1.012,
+          duration: 90,
           yoyo: true,
+          ease: 'Sine.easeInOut',
         });
         if (result.linesCleared > 0) {
           playSfx(result.bloomLines > 0 ? 'bloom' : 'clear', this.run.combo);
           Haptic.clear();
-          this.animateClear(result);
+          this.animateClear(result, piece.color);
+        } else {
+          this.redrawBoard();
         }
         this.tutorialText?.destroy();
         this.tutorialText = null;
-        this.redrawBoard();
         this.buildTray();
         this.refreshHud();
         if (this.run.over) {
-          this.time.delayedCall(400, () => this.onRunOver());
+          this.time.delayedCall(500, () => this.onRunOver());
         }
         return;
       }
@@ -364,26 +381,35 @@ export class GameScene extends Phaser.Scene {
     this.trayContainers[trayIndex]?.setVisible(true);
   }
 
-  private animateClear(result: { linesCleared: number }): void {
-    // flash board then redraw
+  private animateClear(result: ScoreBreakdown, color: number): void {
+    // petal bursts along cleared lines (board already cleared in core)
+    const petalColor = BLOCK_COLORS[Math.max(0, color - 1)] ?? COLORS.blush;
+    for (let n = 0; n < Math.min(result.linesCleared, 4); n++) {
+      const px = BOARD_ORIGIN_X + (2 + n * 2) * CELL + CELL / 2;
+      const py = BOARD_ORIGIN_Y + (3 + n) * CELL + CELL / 2;
+      spawnPetalBurst(this, px, py, petalColor, result.bloomLines > 0 ? 10 : 7);
+    }
+    if (result.bloomLines > 0) {
+      spawnPetalBurst(this, LOGICAL_W / 2, BOARD_ORIGIN_Y + 5 * CELL, COLORS.butter, 12);
+    }
     this.redrawBoard();
-    void result;
   }
 
   private buildBoosters(): void {
     const ids: BoosterId[] = ['undo', 'refresh', 'bomb', 'sweep'];
     const labels = ['↩', '🔄', '💣', '━'];
+    const colors = [UI.peach, UI.sky, UI.accent, UI.mint];
     const startX = 90;
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i]!;
       const x = startX + i * 160;
       const y = 940;
       const btn = makeButton(this, x, y, 140, 80, labels[i]!, () => this.onBooster(id), {
-        color: 0xffcc80,
+        color: colors[i],
         fontSize: '26px',
       });
       const count = this.add
-        .text(x + 50, y - 28, '', { ...FONT.small, fontSize: '16px' })
+        .text(x + 50, y - 28, '', { ...FONT.small, fontSize: '15px', color: UI.textLight })
         .setOrigin(0.5);
       this.boosterLabels[id] = count;
       void btn;
@@ -505,18 +531,26 @@ export class GameScene extends Phaser.Scene {
     const save = loadSave();
     if (this.mode === 'stage' && this.stageId === 1 && !save.tutorial.stage1) {
       this.tutorialText = this.add
-        .text(LOGICAL_W / 2, 860, t('tutorial.drag'), { ...FONT.body, backgroundColor: '#fff3e0' })
+        .text(LOGICAL_W / 2, 860, t('tutorial.drag'), {
+          ...FONT.body,
+          backgroundColor: '#fff0f3',
+          color: UI.text,
+        })
         .setOrigin(0.5)
-        .setPadding(12);
+        .setPadding(14, 10);
       updateSave((s) => {
         s.tutorial.stage1 = true;
       });
     }
     if (this.mode === 'stage' && this.stageId === 2 && !save.tutorial.stage2) {
       this.tutorialText = this.add
-        .text(LOGICAL_W / 2, 860, t('tutorial.seed'), { ...FONT.body, backgroundColor: '#fff3e0' })
+        .text(LOGICAL_W / 2, 860, t('tutorial.seed'), {
+          ...FONT.body,
+          backgroundColor: '#fff0f3',
+          color: UI.text,
+        })
         .setOrigin(0.5)
-        .setPadding(12);
+        .setPadding(14, 10);
       updateSave((s) => {
         s.tutorial.stage2 = true;
       });

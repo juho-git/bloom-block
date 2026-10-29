@@ -11,7 +11,9 @@ let mutedByHidden = false;
 function getCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   if (!ctx) {
-    const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AC) return null;
     ctx = new AC();
   }
@@ -34,43 +36,63 @@ function canPlayBgm(): boolean {
   return unlocked && !mutedByAd && !mutedByHidden && loadSave().settings.bgm;
 }
 
-function beep(freq: number, dur: number, type: OscillatorType = 'sine', gain = 0.08): void {
+/** Soft sine with gentle attack — cozy, not buzzy */
+function softTone(
+  freq: number,
+  dur: number,
+  gain = 0.06,
+  type: OscillatorType = 'sine',
+): void {
   const c = getCtx();
   if (!c || !canPlaySfx()) return;
   const o = c.createOscillator();
   const g = c.createGain();
+  const f = c.createBiquadFilter();
+  f.type = 'lowpass';
+  f.frequency.value = 2400;
   o.type = type;
-  o.frequency.value = freq;
-  g.gain.value = gain;
-  g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
-  o.connect(g);
+  o.frequency.setValueAtTime(freq, c.currentTime);
+  g.gain.setValueAtTime(0.0001, c.currentTime);
+  g.gain.exponentialRampToValueAtTime(gain, c.currentTime + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur);
+  o.connect(f);
+  f.connect(g);
   g.connect(c.destination);
   o.start();
-  o.stop(c.currentTime + dur);
+  o.stop(c.currentTime + dur + 0.02);
+}
+
+function chord(freqs: number[], dur: number, gain = 0.04): void {
+  freqs.forEach((f, i) => softTone(f, dur, gain * (1 - i * 0.15)));
 }
 
 export function playSfx(id: SfxId, combo = 1): void {
   switch (id) {
     case 'place':
-      beep(440, 0.06, 'triangle', 0.06);
+      softTone(523.25, 0.08, 0.045, 'triangle');
+      softTone(659.25, 0.1, 0.03, 'sine');
       break;
-    case 'clear':
-      beep(520 + combo * 40, 0.12, 'sine', 0.09);
+    case 'clear': {
+      const base = 523.25 + Math.min(combo, 5) * 40;
+      softTone(base, 0.12, 0.055);
+      softTone(base * 1.25, 0.16, 0.04);
       break;
+    }
     case 'bloom':
-      beep(660, 0.08, 'sine');
-      setTimeout(() => beep(880, 0.1, 'sine'), 60);
+      softTone(659.25, 0.1, 0.05);
+      setTimeout(() => softTone(783.99, 0.12, 0.045), 70);
+      setTimeout(() => softTone(987.77, 0.16, 0.035), 140);
       break;
     case 'win':
-      beep(523, 0.1);
-      setTimeout(() => beep(659, 0.1), 100);
-      setTimeout(() => beep(784, 0.18), 200);
+      chord([523.25, 659.25, 783.99], 0.22, 0.05);
+      setTimeout(() => softTone(1046.5, 0.28, 0.045), 180);
       break;
     case 'fail':
-      beep(200, 0.2, 'sawtooth', 0.05);
+      softTone(311.13, 0.18, 0.04, 'triangle');
+      setTimeout(() => softTone(246.94, 0.28, 0.035, 'triangle'), 100);
       break;
     case 'click':
-      beep(700, 0.04, 'square', 0.04);
+      softTone(880, 0.045, 0.03, 'sine');
       break;
   }
 }
@@ -81,9 +103,10 @@ function maybeStartBgm(): void {
     return;
   }
   if (bgmTimer !== null) return;
+  // gentle pentatonic lullaby loop
+  const notes = [261.63, 293.66, 329.63, 392.0, 329.63, 293.66];
   const loop = () => {
     if (!canPlayBgm()) return;
-    const notes = [262, 330, 392, 330];
     notes.forEach((f, i) => {
       setTimeout(() => {
         if (!canPlayBgm()) return;
@@ -93,17 +116,18 @@ function maybeStartBgm(): void {
         const g = c.createGain();
         o.type = 'sine';
         o.frequency.value = f;
-        g.gain.value = 0.02;
-        g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.35);
+        g.gain.setValueAtTime(0.0001, c.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.018, c.currentTime + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.5);
         o.connect(g);
         g.connect(c.destination);
         o.start();
-        o.stop(c.currentTime + 0.35);
-      }, i * 400);
+        o.stop(c.currentTime + 0.52);
+      }, i * 520);
     });
   };
   loop();
-  bgmTimer = window.setInterval(loop, 2000) as unknown as number;
+  bgmTimer = window.setInterval(loop, notes.length * 520 + 400) as unknown as number;
 }
 
 export function stopBgm(): void {

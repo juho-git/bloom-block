@@ -12,6 +12,20 @@
 - 광고: `AdsAdapter` + Dummy(실사용) / Poki·GD·Playgama는 **스텁** (문서 미검증 SDK는 호출하지 않음)
 - 테스트: Vitest
 
+## 비주얼·에셋 (코지 가든 톤)
+
+캐주얼 퍼즐을 즐기는 여성 유저를 겨냥해 blush / peach / mint / lavender / cream 파스텔과 젤리 블록, 꽃 마스코트, 줄 지움 꽃잎 파티클로 다듬었습니다. 규칙은 그대로입니다.
+
+| 항목 | 내용 |
+|------|------|
+| 배경 | `#FFF4F0` cream, soft blush wash |
+| 블록 5색 | blush `#FF8FAB` · butter `#FFD56B` · mint `#7DCEB8` · sky `#7EB6E8` · lavender `#B8A0E0` (+ 하트/줄무늬/점/링/꽃잎 패턴) |
+| 본문·강조색 | text `#5A4450`, accent `#F48FB1` |
+| 디스플레이 폰트 | **Jua** (SIL OFL 1.1) — `public/fonts/Jua-Regular.ttf` 셀프 호스트 |
+| 본문 폰트 | **Noto Sans KR** (SIL OFL 1.1) — Google Fonts CDN 서브셋 |
+| 아트 | 전부 코드 드로우 (마스코트·젤리·정원·파티클). 저작권 에셋 없음 |
+| 사운드 | Web Audio 소프트 사인/트라이앵글 (내장) |
+
 ## 실행
 
 ```bash

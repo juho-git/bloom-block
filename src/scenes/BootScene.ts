@@ -5,6 +5,7 @@ import { getAllStages } from '../data/stages';
 import { initAds } from '../platform/createAds';
 import { t } from '../services/i18n';
 import { loadSave } from '../services/save';
+import { drawBloomMascot, paintGardenBackdrop } from '../ui/draw';
 import { FONT, UI } from '../ui/theme';
 
 export class BootScene extends Phaser.Scene {
@@ -14,42 +15,39 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(UI.cream);
-    const title = this.add
-      .text(LOGICAL_W / 2, LOGICAL_H / 2 - 80, t('app.title'), { ...FONT.title, fontSize: '56px' })
+    paintGardenBackdrop(this);
+    drawBloomMascot(this, LOGICAL_W / 2, LOGICAL_H / 2 - 160, 1.2);
+
+    this.add
+      .text(LOGICAL_W / 2, LOGICAL_H / 2 - 40, t('app.title'), {
+        ...FONT.title,
+        fontSize: '56px',
+      })
       .setOrigin(0.5);
-    const barBg = this.add.rectangle(LOGICAL_W / 2, LOGICAL_H / 2 + 40, 400, 24, 0xd7ccc8);
-    const bar = this.add.rectangle(LOGICAL_W / 2 - 200, LOGICAL_H / 2 + 40, 0, 20, UI.accent).setOrigin(0, 0.5);
+
+    const barBg = this.add.graphics();
+    barBg.fillStyle(UI.panelStroke, 0.55);
+    barBg.fillRoundedRect(LOGICAL_W / 2 - 200, LOGICAL_H / 2 + 40, 400, 22, 11);
+
+    const bar = this.add.graphics();
     const status = this.add
       .text(LOGICAL_W / 2, LOGICAL_H / 2 + 90, t('loading'), FONT.small)
       .setOrigin(0.5);
 
-    void this.boot(bar, status, title);
+    void this.boot(bar, status);
   }
 
-  private async boot(
-    bar: Phaser.GameObjects.Rectangle,
-    status: Phaser.GameObjects.Text,
-    _title: Phaser.GameObjects.Text,
-  ): Promise<void> {
-    const steps = [
-      () => {
-        loadSave();
-      },
-      () => {
-        getShapes();
-      },
-      () => {
-        getAllStages();
-      },
-      () => initAds(),
-    ];
+  private async boot(bar: Phaser.GameObjects.Graphics, status: Phaser.GameObjects.Text): Promise<void> {
+    const steps = [() => loadSave(), () => getShapes(), () => getAllStages(), () => initAds()];
     for (let i = 0; i < steps.length; i++) {
       await steps[i]!();
       const p = (i + 1) / steps.length;
-      bar.width = 400 * p;
-      await new Promise((r) => setTimeout(r, 80));
+      bar.clear();
+      bar.fillStyle(UI.accent, 1);
+      bar.fillRoundedRect(LOGICAL_W / 2 - 200, LOGICAL_H / 2 + 40, 400 * p, 22, 11);
+      await new Promise((r) => setTimeout(r, 90));
     }
-    status.setText('✓');
-    this.time.delayedCall(200, () => this.scene.start('Home'));
+    status.setText('🌼');
+    this.time.delayedCall(220, () => this.scene.start('Home'));
   }
 }
