@@ -1,0 +1,9 @@
+{
+  "flowers": [
+    { "id": "rose", "nameKo": "장미", "nameEn": "Rose", "color": "#FF8FAB" },
+    { "id": "sunflower", "nameKo": "해바라기", "nameEn": "Sunflower", "color": "#FFD56B" },
+    { "id": "mint", "nameKo": "민트꽃", "nameEn": "Mint Bloom", "color": "#7DCEB8" },
+    { "id": "sky", "nameKo": "하늘꽃", "nameEn": "Sky Bloom", "color": "#7EB6E8" },
+    { "id": "lavender", "nameKo": "라벤더", "nameEn": "Lavender", "color": "#B8A0E0" }
+  ]
+}

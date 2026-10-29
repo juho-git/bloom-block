@@ -1,0 +1,27 @@
+{
+  "name": "bloom-block",
+  "version": "0.1.0",
+  "private": true,
+  "description": "블룸 블록 — 모바일 웹 블록 퍼즐 MVP",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 43127",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 43127",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate-stages": "tsx tools/validate-stages.ts",
+    "solver-bot": "tsx tools/solver-bot.ts"
+  },
+  "dependencies": {
+    "phaser": "^3.87.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "playwright": "^1.64.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vitest": "^2.1.8"
+  }
+}

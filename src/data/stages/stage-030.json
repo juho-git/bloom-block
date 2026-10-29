@@ -1,0 +1,39 @@
+{
+  "id": 30,
+  "mode": "stage",
+  "seed": 120390,
+  "size": 11,
+  "board": [
+    "..s........",
+    ".s.........",
+    "11s111111.1",
+    "...........",
+    "....s......",
+    "2222s2222.2",
+    "...........",
+    "...........",
+    "...........",
+    "...........",
+    "..........."
+  ],
+  "goals": [
+    {
+      "type": "seeds",
+      "count": 5
+    },
+    {
+      "type": "score",
+      "target": 1050
+    }
+  ],
+  "pieceTier": "large",
+  "fairSpawn": "atLeastOne",
+  "stars": {
+    "three": 25,
+    "two": 42
+  },
+  "rewards": {
+    "coins": 20,
+    "boosterDrop": null
+  }
+}
